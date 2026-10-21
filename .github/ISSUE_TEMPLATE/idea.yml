@@ -1,0 +1,16 @@
+name: Idea or request
+description: A client, a setting or a behaviour you'd like.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you were trying to do
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+    validations:
+      required: true

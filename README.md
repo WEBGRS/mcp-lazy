@@ -1,7 +1,29 @@
 # mcp-lazy
 
-A lazy stdio proxy for the MCP servers in Claude Code and Codex: it answers the handshake from
-cache, starts the real server on the first tool call, and stops it again once it has been idle.
+[![tests](https://github.com/WEBGRS/mcp-lazy/actions/workflows/tests.yml/badge.svg)](https://github.com/WEBGRS/mcp-lazy/actions/workflows/tests.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+
+Keep MCP servers asleep until a tool is called. mcp-lazy is a small stdio proxy for Claude Code
+and Codex: it answers the handshake from cache, starts the real server on the first tool call, and
+stops it again once it has been idle.
+
+![Idle MCP memory: 500 MB to 45 MB for a Claude Code session, ~820 MB to ~45 MB for a Codex session](docs/memory.png)
+
+[中文说明](README.zh-CN.md)
+
+## Quick start
+
+```
+git clone https://github.com/WEBGRS/mcp-lazy
+cd mcp-lazy
+python apply_config.py claude      # and/or: python apply_config.py codex
+```
+
+Restart Claude Code (or Codex). `python apply_config.py claude rollback` puts everything back.
+Details in [Setup](#setup).
+
+## Why
 
 Every Claude Code session and every Codex app-server launches all of its configured MCP servers at
 startup and keeps them running whether you call them or not. One evening I had nine Claude Code
@@ -11,13 +33,26 @@ server. Until a tool is actually called, the server does not exist.
 
 ## What it saves
 
-One Codex app-server on my machine, before and after (2026-10-21):
+One Claude Code session with five servers (2026-10-20): started directly, the five servers held
+500.0 MB of private memory once each had answered the handshake and sat idle for 15 s. Wrapped, the
+same session ran five sleeping proxies at 44.6 MB in total.
+
+| Server | Started directly | Sleeping proxy |
+|---|---|---|
+| firecrawl | 60.7 MB | 9.0 MB |
+| playwright (3 profiles) | 64.1 / 64.9 / 64.9 MB | 9.0 / 8.8 / 8.8 MB |
+| rea | 245.5 MB | 9.0 MB |
+| **Total** | **500.0 MB** | **44.6 MB** |
+
+One Codex app-server, before and after (2026-10-21). Codex launched the npm servers through `npx`,
+which is why each one costs more here:
 
 | Server | Before | With mcp-lazy, until a tool is called |
 |---|---|---|
 | playwright (3 profiles) | ~145 MB each: `cmd` → `npx` → `cmd` → `node` | ~9 MB each |
 | firecrawl | ~143 MB, same `npx` chain | ~9 MB |
 | rea | ~243 MB | ~9 MB |
+| *Subtotal, the five wrapped servers* | *~820 MB* | *~45 MB* |
 | windows-mcp | ~800 MB, one `uvx` instance per app-server | none: points at a shared HTTP instance* |
 | **Total** | **~1.6 GB** | **~45 MB** |
 
@@ -28,9 +63,10 @@ The price is paid on the first call after a server has gone to sleep (median of 
 spawn plus `initialize`): playwright 0.5 s, firecrawl 0.9 s, rea 2.4 s.
 
 How these were measured: "before" is the private memory (`psutil` `memory_info().private`) of every
-process in each server's tree under the Codex app-server; "after" is the `PROXY MB` column of
-`lazy_mcp.py --status`. Start times come from running the proxy against an empty cache directory.
-Windows 11, Python 3.13, Node 24.
+process in each server's tree (for Claude Code: each server started on its own with `node`, 15 s
+after the handshake; for Codex: the trees under the running app-server); "after" is the `PROXY MB`
+column of `lazy_mcp.py --status`. Start times come from running the proxy against an empty cache
+directory. Windows 11, Python 3.13, Node 24.
 
 ## How it works
 
@@ -133,8 +169,8 @@ state in `run/NAME-PID.json`.
 
 ## Limits
 
-- Only tested on Windows 11. The POSIX code path (process groups instead of job objects) exists but
-  hasn't been run.
+- Used day to day on Windows 11 only. On Linux the test suite passes (process groups instead of job
+  objects), but no real client has run on it yet; macOS hasn't been tried.
 - Don't wrap a server that has to stay up on its own, for example one that pushes notifications
   without being asked.
 - If a server's tool list changes between sessions, a session sees the cached list until the server
@@ -143,12 +179,17 @@ state in `run/NAME-PID.json`.
 ## Tests
 
 ```
-cd tests
-python -m unittest test_lazy test_apply -v
+python -m unittest discover -s tests -v
 ```
 
 42 tests, about 30 seconds. They run against a fake MCP server and temporary copies of a Codex
-config and a Claude Code config, never your real ones.
+config and a Claude Code config, never your real ones. CI runs them on Windows and Linux with
+Python 3.11 and 3.13.
+
+## Contributing
+
+Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). For security
+problems, see [SECURITY.md](SECURITY.md).
 
 ## License
 
@@ -159,6 +200,10 @@ MIT. No telemetry; the proxy itself never touches the network.
 | Claim | Source of truth | Verdict |
 |---|---|---|
 | 87 `node` processes, ~8 GB, nine sessions | process snapshot during the 2026-10-14 slowdown | ok |
+| Claude Code session: 60.7 / 64.1 / 64.9 / 64.9 / 245.5 MB = 500.0 MB | `measure_v1.py` → `v1-measure.json`, 2026-10-20 15:27 | ok |
+| Same session wrapped: 9.0 + 9.0 + 8.8 + 8.8 + 9.0 = 44.6 MB | `--status` in the recording of that session, 2026-10-20 | ok |
+| Codex subtotal ~820 MB | 3 × 145 + 143 + 243 = 821 MB from the row below | ok |
+| Tests pass on Linux | Ubuntu 24.04 (WSL), Python 3.12.3: 42 tests, 1 Windows-only skipped, 2026-10-21 | ok |
 | Before: 145 / 143 / 243 / ~800 MB, total ~1.6 GB | `psutil` private memory of each server tree under the Codex app-server, 2026-10-21 | ok |
 | ~9 MB per sleeping proxy | `--status`: 35 proxies, 316 MB | ok |
 | Shared windows-mcp instance 837 MB | `psutil`, whole process tree of the shared server | ok |

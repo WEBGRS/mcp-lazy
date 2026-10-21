@@ -1,0 +1,42 @@
+name: A server doesn't start or acts differently through mcp-lazy
+description: Something works without mcp-lazy and breaks with it.
+labels: [bug]
+body:
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      options:
+        - Claude Code
+        - Codex
+        - Other (say which below)
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System and Python
+      placeholder: Windows 11, Python 3.13
+    validations:
+      required: true
+  - type: textarea
+    id: server
+    attributes:
+      label: The server
+      description: Its entry from ~/.claude.json or config.toml. Remove API keys and tokens first.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The end of logs/NAME.log and the output of `python lazy_mcp.py --status`.
+      render: text
