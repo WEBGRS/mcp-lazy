@@ -1,0 +1,10 @@
+cache/
+logs/
+run/
+pkgs/
+__pycache__/
+*.tmp
+*.bak*
+local.json
+original-mcpServers.json
+original-codex-mcp.json

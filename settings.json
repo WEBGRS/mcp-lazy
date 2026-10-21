@@ -1,0 +1,7 @@
+{
+  "idle_seconds": {
+    "*": 600
+  },
+  "max_cache_age_days": 7,
+  "start_timeout_seconds": 120
+}
